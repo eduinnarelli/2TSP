@@ -3,7 +3,7 @@ Problema dos Dois Caixeiros Viajantes (2TSP)
 
 Atividade 2 de MC859 - Projeto em Teoria da Computação.
 
-Grupo:
+**Grupo:**
   - Eduardo Barros Innarelli (170161)
   - ...
 
