@@ -119,6 +119,7 @@ def k_tsp(K, n, dist):
     # Otimizar modelo, indicando callback a ser chamada após a solução ótima do
     # modelo relaxado ser encontrada
     m.Params.lazyConstraints = 1
+    m.setParam(GRB.param.TimeLimit, 1800)
     m.optimize(subtour_elimination)
 
     # Recuperar solução
@@ -131,8 +132,10 @@ def k_tsp(K, n, dist):
 
     # Imprimir solução
     print('')
+    print('Vertices: %d' % n)
     print('Optimal tour: %s' % str(tour))
     print('Optimal cost: %g' % m.objVal)
+    print('Runtime: %ss' % str(m.Runtime))
     print('')
 
 # Carregar instâncias em 'fixed_instances.pkl'
