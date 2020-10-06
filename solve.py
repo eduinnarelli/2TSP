@@ -149,5 +149,10 @@ def k_tsp(K, n, dist):
 with open("instances/fixed_instances.pkl", "rb") as fp:
     instances = pickle.load(fp)
 
-# TODO: executar 1-TSP e 2-TSP p/ todas as instâncias
-# (chamar k_tsp(1 ou 2, inst['n'], inst['dist']))
+# Executa 1-TSP e 2-TSP p/ todas as instâncias
+for instance in instances:
+    n = instance['n']
+    dist = instance[ 'dist']
+
+    k_tsp(1, n, dist)
+    k_tsp(2, n, dist)
