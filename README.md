@@ -5,8 +5,8 @@ Atividade 2 de MC859 - Projeto em Teoria da Computação.
 
 **Grupo:**
   - Eduardo Barros Innarelli (170161)
+  - Guilherme de Oliveira Macedo (208395)
   - Rogério Meirelles (160245)
-  - ...
 
 Disciplina oferecida no 2º semestre de 2020 pelo professor [Fábio Luiz Usberti](https://www.ic.unicamp.br/~fusberti/).
 
