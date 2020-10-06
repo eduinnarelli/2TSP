@@ -114,7 +114,7 @@ def k_tsp(K, n, dist):
 
     # Restrições de disjunção entre arestas de diferentes rotas
     m.addConstrs(
-        (vars.sum(i, j, '*') == 2 for i in range(n) for j in range(i)), 
+        (vars.sum(i, j, '*') <= 1 for i in range(n) for j in range(i)), 
         name='disj'
     )
 
