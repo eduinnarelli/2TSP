@@ -131,10 +131,12 @@ def k_tsp(K, n, dist):
 
     # Recuperar solução
     vals = m.getAttr('x', vars)
-    selected = gp.tuplelist((i, j) for i, j in vals.keys() if vals[i, j] > 0.5)
-
+    selected = gp.tuplelist(
+        (i, j) for i, j, k in vals.keys()
+        if vals[i, j, k] > 0.5
+    )
     # Garantir que rota tenha tamanho n
-    tour = shortest_cycle(selected)
+    tour = shortest_cycle(n, selected)
     assert len(tour) == n
 
     # Imprimir solução
