@@ -1,3 +1,4 @@
+#%%
 import sys
 import math
 import pickle
@@ -6,7 +7,7 @@ from itertools import combinations
 import gurobipy as gp
 from gurobipy import GRB
 
-def shortest_cycle(n, edges):
+def shortest_cycle(n, m, edges):
     '''
     Função auxiliar para que constrói o menor ciclo de um conjunto de arestas,
     em termos do número de vértices no ciclo.
@@ -19,7 +20,7 @@ def shortest_cycle(n, edges):
     unvisited = list(range(n))
 
     # Tamanho inicial tem um nó a mais, p/ forçar atualização
-    cycle = range(n+1) 
+    cycle = range(n + 1) 
 
     while unvisited:  # 'True' enquanto pilha for não-vazia
         thiscycle = []
@@ -32,8 +33,9 @@ def shortest_cycle(n, edges):
             unvisited.remove(current)
             # 'select(current, '*')' retorna todos vizinhos de 'current' 
             neighbors = [
-                j for i, j in edges.select(current, '*')
-                if j in unvisited
+                j 
+                for i, j, k in edges.select(current, '*')
+                    if j in unvisited and k == m
             ]
 
         # Atualizar menor ciclo, se preciso
@@ -56,26 +58,27 @@ def subtour_elimination(model, where):
 
     if where == GRB.Callback.MIPSOL:
         # Analisar cada rota
-        for k in range(model._K):
+        for m in range(model._K):
 
             # Criar lista de arestas selecionadas na solução
             vals = model.cbGetSolution(model._vars)
             selected = gp.tuplelist(
-                (i, j) for i, j, k in model._vars.keys()
-                if vals[i, j, k] > 0.5
+                (i, j, k) 
+                    for i, j, k in model._vars.keys()
+                        if vals[i, j, k] > 0.5 and k == m
             )
 
             # Encontrar menor ciclo e verificar se viola restrição, i.e., se
             # não percorre todos os vértices, formando um subciclo
-            cycle = shortest_cycle(model._n, selected)
+            cycle = shortest_cycle(model._n, m, selected)
             if len(cycle) < n:
 
                 # Adicionar restrições de eliminação de subciclo, para cada par 
                 # de vértices do subciclo encontrado
                 model.cbLazy(
                     gp.quicksum(
-                        model._vars[i, j, k]
-                        for i, j in combinations(cycle, 2)
+                        model._vars[i, j, m]
+                            for i, j in combinations(cycle, 2)
                     ) <= len(cycle)-1
                 )
 
@@ -132,17 +135,21 @@ def k_tsp(K, n, dist):
     # Recuperar solução
     vals = m.getAttr('x', vars)
     selected = gp.tuplelist(
-        (i, j) for i, j, k in vals.keys()
+        (i, j, k) for i, j, k in vals.keys()
         if vals[i, j, k] > 0.5
     )
     # Garantir que rota tenha tamanho n
-    tour = shortest_cycle(n, selected)
-    assert len(tour) == n
+    tours = {}
+    for t in range(K):
+        tours[t] = shortest_cycle(n, t, selected)
+        assert len(tours[t]) == n
 
     # Imprimir solução
     print('')
     print('Vertices: %d' % n)
-    print('Optimal tour: %s' % str(tour))
+
+    for t in range(K):
+        print('Optimal tour {}: {}'.format(t, tours[t]))
     print('Optimal cost: %g' % m.objVal)
     print('Runtime: %ss' % str(m.Runtime))
     print('')
@@ -158,3 +165,5 @@ for instance in instances:
 
     k_tsp(1, n, dist)
     k_tsp(2, n, dist)
+
+#%%
