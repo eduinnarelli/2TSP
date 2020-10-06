@@ -67,7 +67,7 @@ def subtour_elimination(model, where):
 
             # Encontrar menor ciclo e verificar se viola restrição, i.e., se
             # não percorre todos os vértices, formando um subciclo
-            cycle = shortest_cycle(m._n, selected)
+            cycle = shortest_cycle(model._n, selected)
             if len(cycle) < n:
 
                 # Adicionar restrições de eliminação de subciclo, para cada par 
@@ -94,8 +94,15 @@ def k_tsp(K, n, dist):
 
     m = gp.Model(str(K) + '-tsp')
 
+    # Adapta o dicionário de distâncias de acordo com a quantidade de caixeiros
+    distK = {}
+    for i in range(n):
+        for j in range(i):
+            for k in range(K):
+                distK[i, j, k] = dist[i, j]
+
     # Criar variáveis
-    vars = m.addVars(dist.keys(), K, obj=dist, vtype=GRB.BINARY, name='x')
+    vars = m.addVars(distK.keys(), obj=distK, vtype=GRB.BINARY, name='x')
     for i, j, k in vars.keys():
         vars[j, i, k] = vars[i, j, k]  # grafo não-orientado
 
