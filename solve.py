@@ -7,14 +7,18 @@ from itertools import combinations
 import gurobipy as gp
 from gurobipy import GRB
 
-def shortest_cycle(n, m, edges):
+def shortest_cycle(n, edges):
     '''
-    Função auxiliar para que constrói o menor ciclo de um conjunto de arestas,
+    Função auxiliar que constrói o menor ciclo de um conjunto de arestas,
     em termos do número de vértices no ciclo.
 
     Args:
         n: nº de vértices.
         edges: lista de tuplas de arestas.
+
+    Returns:
+        Lista de vértices no menor ciclo, cada um conectado com o anterior
+        e próximo da lista.
     '''
 
     unvisited = list(range(n))
@@ -31,11 +35,11 @@ def shortest_cycle(n, m, edges):
             current = neighbors[0]
             thiscycle.append(current)
             unvisited.remove(current)
-            # 'select(current, '*')' retorna todos vizinhos de 'current' 
+            # 'select(current, '*')' retorna todos vizinhos de 'current'
             neighbors = [
                 j 
-                for i, j, k in edges.select(current, '*')
-                    if j in unvisited and k == m
+                for i, j in edges.select(current, '*')
+                if j in unvisited
             ]
 
         # Atualizar menor ciclo, se preciso
@@ -57,28 +61,28 @@ def subtour_elimination(model, where):
     '''
 
     if where == GRB.Callback.MIPSOL:
-        # Analisar cada rota
-        for m in range(model._K):
+        # Analisar cada rota t
+        for t in range(model._K):
 
-            # Criar lista de arestas selecionadas na solução
-            vals = model.cbGetSolution(model._vars)
-            selected = gp.tuplelist(
-                (i, j, k) 
-                    for i, j, k in model._vars.keys()
-                        if vals[i, j, k] > 0.5 and k == m
+            # Criar lista de arestas na rota t selecionadas na solução
+            x_sol = model.cbGetSolution(model._vars)
+            edges_in_tour = gp.tuplelist(
+                (i, j) 
+                for i, j, k in model._vars.keys()
+                if x_sol[i, j, k] > 0.5 and k == t
             )
 
             # Encontrar menor ciclo e verificar se viola restrição, i.e., se
             # não percorre todos os vértices, formando um subciclo
-            cycle = shortest_cycle(model._n, m, selected)
+            cycle = shortest_cycle(model._n, edges_in_tour)
             if len(cycle) < n:
 
                 # Adicionar restrições de eliminação de subciclo, para cada par 
                 # de vértices do subciclo encontrado
                 model.cbLazy(
                     gp.quicksum(
-                        model._vars[i, j, m]
-                            for i, j in combinations(cycle, 2)
+                        model._vars[i, j, t]
+                        for i, j in combinations(cycle, 2)
                     ) <= len(cycle)-1
                 )
 
@@ -95,75 +99,85 @@ def k_tsp(K, n, dist):
         dist: dicionário de custo das arestas (i,j).
     '''
 
-    m = gp.Model(str(K) + '-tsp')
+    model = gp.Model(str(K) + '-tsp')
 
-    # Adapta o dicionário de distâncias de acordo com a quantidade de caixeiros
-    distK = {}
-    for i in range(n):
-        for j in range(i):
-            for k in range(K):
-                distK[i, j, k] = dist[i, j]
+    # Adaptar o dicionário de distâncias de acordo com a quantidade de 
+    # caixeiros
+    distK = {
+        (i, j, k):  dist[i, j] 
+                    for i in range(n) for j in range(i) for k in range(K)
+    }
 
     # Criar variáveis
-    vars = m.addVars(distK.keys(), obj=distK, vtype=GRB.BINARY, name='x')
+    vars = model.addVars(distK.keys(), obj=distK, vtype=GRB.BINARY, name='x')
     for i, j, k in vars.keys():
         vars[j, i, k] = vars[i, j, k]  # grafo não-orientado
 
     # Restrições de grau 2, p/ cada rota k
-    m.addConstrs(
+    model.addConstrs(
         (vars.sum(i, '*', k) == 2 for i in range(n) for k in range(K)), 
         name='deg-2'
     )
 
-    # Restrições de disjunção entre arestas de diferentes rotas
-    m.addConstrs(
+    # Restrições de disjunção entre arestas de diferentes rotas; se K = 1, tais 
+    # restrições são redundantes e eliminadas pelo solver na etapa de 'presolve' 
+    # da otimização
+    model.addConstrs(
         (vars.sum(i, j, '*') <= 1 for i in range(n) for j in range(i)), 
         name='disj'
     )
 
     # Salvar alguns atributos no modelo para acessá-los facilmente na callback
-    m._n = n
-    m._K = K
-    m._vars = vars
+    model._n = n
+    model._K = K
+    model._vars = vars
 
     # Otimizar modelo, indicando callback a ser chamada após a solução ótima do
     # modelo relaxado ser encontrada
-    m.Params.lazyConstraints = 1
-    m.setParam(GRB.param.TimeLimit, 1800)
-    m.optimize(subtour_elimination)
+    model.Params.lazyConstraints = 1
+    model.setParam(GRB.param.TimeLimit, 1800)
+    model.optimize(subtour_elimination)
 
     # Recuperar solução
-    vals = m.getAttr('x', vars)
-    selected = gp.tuplelist(
-        (i, j, k) for i, j, k in vals.keys()
-        if vals[i, j, k] > 0.5
+    x_sol = model.getAttr('x', vars)
+    edges_in_sol = gp.tuplelist(
+        (i, j, k) for i, j, k in x_sol.keys()
+        if x_sol[i, j, k] > 0.5
     )
-    # Garantir que rota tenha tamanho n
+
+    # Garantir que cada rota tenha tamanho n
     tours = {}
     for t in range(K):
-        tours[t] = shortest_cycle(n, t, selected)
+        edges_in_tour = gp.tuplelist(
+            (i,j) for i, j, k in edges_in_sol
+            if k == t
+        )
+        tours[t] = shortest_cycle(n, edges_in_tour)
         assert len(tours[t]) == n
 
     # Imprimir solução
     print('')
     print('Vertices: %d' % n)
-
     for t in range(K):
-        print('Optimal tour {}: {}'.format(t, tours[t]))
-    print('Optimal cost: %g' % m.objVal)
-    print('Runtime: %ss' % str(m.Runtime))
+        print(f'Optimal tour {t}: {tours[t]}')
+    print('Optimal cost: %g' % model.objVal)
+    print('Runtime: %ss' % str(model.Runtime))
     print('')
 
-# Carregar instâncias em 'fixed_instances.pkl'
+
+# Carregar instâncias salvas em 'fixed_instances.pkl'
 with open("instances/fixed_instances.pkl", "rb") as fp:
     instances = pickle.load(fp)
 
-# Executa 1-TSP e 2-TSP p/ todas as instâncias
+dash = '===================='
+
+# Executar 1-TSP e 2-TSP p/ todas as instâncias
 for instance in instances:
     n = instance['n']
     dist = instance[ 'dist']
 
-    k_tsp(1, n, dist)
-    k_tsp(2, n, dist)
+    for k in [1,2]:
+        print(f'\n{dash} SOLUÇÃO DO {k}-TSP PARA N = {n} {dash}\n')
+        k_tsp(k, n, dist)
 
 #%%
