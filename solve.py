@@ -86,7 +86,98 @@ def subtour_elimination(model, where):
                     ) <= len(cycle)-1
                 )
 
+def k_tsp_heuristic(K, n, dist):
+    '''
+    Função que define e resolve heurísticamente o modelo para o K-TSP, dada uma determinada 
+    instância. Aqui, K-TSP generaliza o TSP e o 2-TSP para qualquer K, o que
+    evita a implementação de modelos diferentes.
 
+    Args:
+        K: nº de caixeiros viajantes.
+        n: nº de vértices do grafo.
+        dist: dicionário de custo das arestas (i,j).
+    '''
+
+    # instanciate the data problem
+    distK = {
+        (i, j, 0) : dist[i, j]
+                        for i in range(n) for j in range(i)
+    }
+
+    # set environment
+    env = gp.Env(empty = True)
+    env.setParam('OutputFlag', 0)
+    env.start()
+
+    # create the model
+    model = gp.Model(name = 'tsp-h', env = env)
+    model.modelSense = GRB.MINIMIZE
+    model.Params.timeLimit = 1800.0
+    model.Params.lazyConstraints = 1
+
+    # add decision variables
+    vars = model.addVars(distK.keys(), obj = distK, vtype = GRB.BINARY, name = 'x')
+
+    for i, j, k in vars.keys():
+        vars[j, i, k] = vars[i, j, k]
+
+    # add constraints
+    model.addConstrs((vars.sum(i, '*', 0) == 2 for i in range(n)), name = 'deg-2')
+
+    # save attributes in the model
+    model._n = n
+    model._K = 1
+    model._vars = vars
+
+    # solve the model
+    model.optimize(subtour_elimination)
+
+    # save the objective function and runtime values
+    objective_function = model.objVal
+    runtime = model.Runtime
+
+    # optimal solution
+    x_sol = model.getAttr('x', vars)
+    edges_in_sol = gp.tuplelist(
+        (i, j, k) for i, j, k in x_sol.keys()
+        if x_sol[i, j, k] > 0.5
+    )
+
+    # validate optimal solution
+    tours = {}
+    edges_in_tour = gp.tuplelist((i, j) for i, j, k in edges_in_sol if k == 0)
+    tours[0] = shortest_cycle(n, edges_in_tour)
+    assert len(tours[0]) == n
+
+    for r in range(1, K):
+
+        # add new constraints
+        model.addConstrs((vars[m] == 0 for m in edges_in_sol), name = 'first_solution')
+
+        # solve the model
+        model.optimize(subtour_elimination)
+
+        # optimal solution
+        x_sol = model.getAttr('x', vars)
+        edges_in_sol = gp.tuplelist(
+            (i, j, k) for i, j, k in x_sol.keys()
+            if x_sol[i, j, k] > 0.5
+        )
+
+        # validate optimal solution
+        edges_in_tour = gp.tuplelist((i, j) for i, j, k in edges_in_sol if k == 0)
+        tours[r] = shortest_cycle(n, edges_in_tour)
+        assert len(tours[r]) == n
+
+    # print solution
+    print('')
+    print('Vertices: %d' % n)
+    for t in range(len(tours)):
+        print(f'Optimal tour {t}: {tours[t]}')
+    print('Optimal cost: %g' % (model.objVal + objective_function))
+    print('Runtime: %ss' % str(model.Runtime + runtime))
+    print('')
+    
 def k_tsp(K, n, dist):
     '''
     Função que define e resolve o modelo para o K-TSP, dada uma determinada 
@@ -99,7 +190,11 @@ def k_tsp(K, n, dist):
         dist: dicionário de custo das arestas (i,j).
     '''
 
-    model = gp.Model(str(K) + '-tsp')
+    env = gp.Env(empty = True)
+    env.setParam('OutputFlag', 0)
+    env.start()
+
+    model = gp.Model(name = str(K) + '-tsp', env = env)
 
     # Adaptar o dicionário de distâncias de acordo com a quantidade de 
     # caixeiros
@@ -174,10 +269,13 @@ dash = '===================='
 # Executar 1-TSP e 2-TSP p/ todas as instâncias
 for instance in instances:
     n = instance['n']
-    dist = instance[ 'dist']
+    dist = instance['dist']
 
     for k in [1,2]:
         print(f'\n{dash} SOLUÇÃO DO {k}-TSP PARA N = {n} {dash}\n')
         k_tsp(k, n, dist)
+
+    print(f'\n{dash} SOLUÇÃO HEURÍSTICA DO {k}-TSP PARA N = {n} {dash}\n')
+    k_tsp_heuristic(2, n, dist)
 
 #%%
