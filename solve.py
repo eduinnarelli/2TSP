@@ -171,7 +171,7 @@ def k_tsp_heuristic(K, n, dist):
         tours[r] = shortest_cycle(n, edges_in_tour)
         assert len(tours[r]) == n
 
-        #sava the solution
+        # save the solution
         objective_function.append(model.objVal)
         runtime.append(model.Runtime)
 
@@ -283,5 +283,5 @@ for instance in instances:
 
     print(f'\n{dash} SOLUÇÃO HEURÍSTICA DO {k}-TSP PARA N = {n} {dash}\n')
     k_tsp_heuristic(2, n, dist)
-    
+
 #%%
