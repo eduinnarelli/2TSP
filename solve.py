@@ -133,8 +133,10 @@ def k_tsp_heuristic(K, n, dist):
     model.optimize(subtour_elimination)
 
     # save the objective function and runtime values
-    objective_function = model.objVal
-    runtime = model.Runtime
+    objective_function = []
+    objective_function.append(model.objVal)
+    runtime = []
+    runtime.append(model.Runtime)
 
     # optimal solution
     x_sol = model.getAttr('x', vars)
@@ -169,13 +171,17 @@ def k_tsp_heuristic(K, n, dist):
         tours[r] = shortest_cycle(n, edges_in_tour)
         assert len(tours[r]) == n
 
+        #sava the solution
+        objective_function.append(model.objVal)
+        runtime.append(model.Runtime)
+
     # print solution
     print('')
     print('Vertices: %d' % n)
     for t in range(len(tours)):
         print(f'Optimal tour {t}: {tours[t]}')
-    print('Optimal cost: %g' % (model.objVal + objective_function))
-    print('Runtime: %ss' % str(model.Runtime + runtime))
+    print('Optimal cost: %g' % sum(objective_function))
+    print('Runtime: %ss' % str(sum(runtime)))
     print('')
     
 def k_tsp(K, n, dist):
@@ -277,5 +283,5 @@ for instance in instances:
 
     print(f'\n{dash} SOLUÇÃO HEURÍSTICA DO {k}-TSP PARA N = {n} {dash}\n')
     k_tsp_heuristic(2, n, dist)
-
+    
 #%%
