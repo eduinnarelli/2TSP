@@ -4,6 +4,7 @@ import math
 import pickle
 import random
 from itertools import combinations
+from tqdm import tqdm
 import gurobipy as gp
 from gurobipy import GRB
 
@@ -90,99 +91,54 @@ def k_tsp_heuristic(K, n, dist):
     '''
     Função que define e resolve heurísticamente o modelo para o K-TSP, dada uma determinada 
     instância. Aqui, K-TSP generaliza o TSP e o 2-TSP para qualquer K, o que
-    evita a implementação de modelos diferentes.
+    evita a implementação de modelos diferentes. A heurística consiste em resolver o 1-TSP
+    K vezes, cada uma para um subgrafo da instância sem as arestas da solução anterior.
 
     Args:
         K: nº de caixeiros viajantes.
         n: nº de vértices do grafo.
-        dist: dicionário de custo das arestas (i,j).
+        dist: dicionário de custo das arestas (i,j), i >= j.
+    
+    Returns:
+        Dicionário da solução, contendo as K 'tours', 'objVal' e 'runTime'.
     '''
 
-    # instanciate the data problem
-    distK = {
-        (i, j, 0) : dist[i, j]
-                        for i in range(n) for j in range(i)
+    # Criar cópia do dicionário de distâncias p/ evitar modificar original
+    dist_copy = dist.copy()
+
+    # Inicializar dicionário com solução
+    sol = {
+        'tours': {},
+        'objVal': 0,
+        'runTime': 0,
     }
 
-    # set environment
-    env = gp.Env(empty = True)
-    env.setParam('OutputFlag', 0)
-    env.start()
+    for t in range(K):
 
-    # create the model
-    model = gp.Model(name = 'tsp-h', env = env)
-    model.modelSense = GRB.MINIMIZE
-    model.Params.timeLimit = 1800.0
-    model.Params.lazyConstraints = 1
+        # Resolver 1-TSP
+        sol_1_tsp = k_tsp(1, n, dist_copy)
 
-    # add decision variables
-    vars = model.addVars(distK.keys(), obj = distK, vtype = GRB.BINARY, name = 'x')
+        # Incrementar custo e tempo na solução
+        sol['objVal'] += sol_1_tsp['objVal']
+        sol['runTime'] += sol_1_tsp['runTime']
 
-    for i, j, k in vars.keys():
-        vars[j, i, k] = vars[i, j, k]
+        # Acoplar rota encontrada à solução
+        sol['tours'][t] = sol_1_tsp['tours'][0]
 
-    # add constraints
-    model.addConstrs((vars.sum(i, '*', 0) == 2 for i in range(n)), name = 'deg-2')
+        # Percorrer rota
+        tour = sol['tours'][t]
+        for i, j in zip(tour, tour[1:] + tour[:1]):
 
-    # save attributes in the model
-    model._n = n
-    model._K = 1
-    model._vars = vars
+            # Emular remoção da aresta (i,j) ou (j,i), dependendo de como
+            # estiver no dicionário. Atribuimos um custo infinito a essas
+            # arestas para indicar ao modelo que elas não devem estar na 
+            # próxima solução.
+            if (i,j) in dist:
+                dist_copy[i,j] = float('inf')
+            else:
+                dist_copy[j,i] = float('inf')          
 
-    # solve the model
-    model.optimize(subtour_elimination)
-
-    # save the objective function and runtime values
-    objective_function = []
-    objective_function.append(model.objVal)
-    runtime = []
-    runtime.append(model.Runtime)
-
-    # optimal solution
-    x_sol = model.getAttr('x', vars)
-    edges_in_sol = gp.tuplelist(
-        (i, j, k) for i, j, k in x_sol.keys()
-        if x_sol[i, j, k] > 0.5
-    )
-
-    # validate optimal solution
-    tours = {}
-    edges_in_tour = gp.tuplelist((i, j) for i, j, k in edges_in_sol if k == 0)
-    tours[0] = shortest_cycle(n, edges_in_tour)
-    assert len(tours[0]) == n
-
-    for r in range(1, K):
-
-        # add new constraints
-        model.addConstrs((vars[m] == 0 for m in edges_in_sol), name = 'first_solution')
-
-        # solve the model
-        model.optimize(subtour_elimination)
-
-        # optimal solution
-        x_sol = model.getAttr('x', vars)
-        edges_in_sol = gp.tuplelist(
-            (i, j, k) for i, j, k in x_sol.keys()
-            if x_sol[i, j, k] > 0.5
-        )
-
-        # validate optimal solution
-        edges_in_tour = gp.tuplelist((i, j) for i, j, k in edges_in_sol if k == 0)
-        tours[r] = shortest_cycle(n, edges_in_tour)
-        assert len(tours[r]) == n
-
-        # save the solution
-        objective_function.append(model.objVal)
-        runtime.append(model.Runtime)
-
-    # print solution
-    print('')
-    print('Vertices: %d' % n)
-    for t in range(len(tours)):
-        print(f'Optimal tour {t}: {tours[t]}')
-    print('Optimal cost: %g' % sum(objective_function))
-    print('Runtime: %ss' % str(sum(runtime)))
-    print('')
+    return sol
     
 def k_tsp(K, n, dist):
     '''
@@ -193,13 +149,18 @@ def k_tsp(K, n, dist):
     Args:
         K: nº de caixeiros viajantes.
         n: nº de vértices do grafo.
-        dist: dicionário de custo das arestas (i,j).
+        dist: dicionário de custo das arestas (i,j), i >= j.
+
+    Returns:
+        Dicionário da solução, contendo as K 'tours', 'objVal' e 'runTime'.
     '''
 
+    # Inicializar ambiente
     env = gp.Env(empty = True)
     env.setParam('OutputFlag', 0)
     env.start()
 
+    # Inicializar modelo
     model = gp.Model(name = str(K) + '-tsp', env = env)
 
     # Adaptar o dicionário de distâncias de acordo com a quantidade de 
@@ -256,13 +217,30 @@ def k_tsp(K, n, dist):
         tours[t] = shortest_cycle(n, edges_in_tour)
         assert len(tours[t]) == n
 
-    # Imprimir solução
+    # Retornar dicionário com solução
+    return {
+        'tours': tours,
+        'objVal': model.objVal,
+        'runTime': model.Runtime,
+    }
+
+def print_solution(K, n, sol): 
+    '''
+    Função que imprime solução no stdout.
+
+    Args:
+        K: nº de caixeiros viajantes.
+        n: nº de vértices do grafo.
+        sol: dicionário da solução, contendo 'tours', 'objVal' e 'runTime'. 
+    '''
+
     print('')
     print('Vertices: %d' % n)
     for t in range(K):
-        print(f'Optimal tour {t}: {tours[t]}')
-    print('Optimal cost: %g' % model.objVal)
-    print('Runtime: %ss' % str(model.Runtime))
+        tour = sol['tours'][t]
+        print(f'Optimal tour {t}: {tour}')
+    print('Optimal cost: %g' % sol['objVal'])
+    print('Runtime: %ss' % str(sol['runTime']))
     print('')
 
 
@@ -272,16 +250,24 @@ with open("instances/fixed_instances.pkl", "rb") as fp:
 
 dash = '===================='
 
-# Executar 1-TSP e 2-TSP p/ todas as instâncias
-for instance in instances:
+# Salvar output em 'output.txt'
+sys.stdout = open('output.txt', 'w')
+
+for instance in tqdm(instances):
     n = instance['n']
     dist = instance['dist']
 
-    for k in [1,2]:
-        print(f'\n{dash} SOLUÇÃO DO {k}-TSP PARA N = {n} {dash}\n')
-        k_tsp(k, n, dist)
+    # Resolver 1-TSP e 2-TSP de forma ótima
+    for K in [1,2]:
+        print(f'\n{dash} SOLUÇÃO DO {K}-TSP PARA N = {n} {dash}\n')
+        sol = k_tsp(K, n, dist)
+        print_solution(K, n, sol)
 
-    print(f'\n{dash} SOLUÇÃO HEURÍSTICA DO {k}-TSP PARA N = {n} {dash}\n')
-    k_tsp_heuristic(2, n, dist)
+    # Resolver 2-TSP de forma heurística
+    print(f'\n{dash} SOLUÇÃO HEURÍSTICA DO 2-TSP PARA N = {n} {dash}\n')
+    sol = k_tsp_heuristic(2, n, dist)
+    print_solution(K, n, sol)
+
+sys.stdout.close()
 
 #%%
