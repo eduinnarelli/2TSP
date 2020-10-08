@@ -194,10 +194,10 @@ def k_tsp(K, n, dist):
     model._K = K
     model._vars = vars
 
-    # Otimizar modelo, indicando callback a ser chamada após a solução ótima do
-    # modelo relaxado ser encontrada
+    # Otimizar modelo em no máximo 30 minutos, indicando callback a ser chamada 
+    # após a solução ótima do modelo relaxado ser encontrada
     model.Params.lazyConstraints = 1
-    model.setParam(GRB.param.TimeLimit, 1800)
+    model.Params.timeLimit = 1800.0
     model.optimize(subtour_elimination)
 
     # Recuperar solução
