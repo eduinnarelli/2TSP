@@ -251,6 +251,7 @@ with open("instances/fixed_instances.pkl", "rb") as fp:
 dash = '===================='
 
 # Salvar output em 'output.txt'
+print("Solutions will be saved at 'output.txt'")
 sys.stdout = open('output.txt', 'w')
 
 for instance in tqdm(instances):
