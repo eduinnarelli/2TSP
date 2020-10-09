@@ -1,3 +1,9 @@
+'''
+Nesse módulo são geradas 5 instâncias para o problema 2-TSP. Renomeamos as 
+instâncias que geramos e testamos (`fixed_instances.pkl`) para evitar que a 
+execução desse código as sobreponha.
+'''
+
 import math
 import pickle
 import random

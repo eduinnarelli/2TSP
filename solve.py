@@ -1,3 +1,12 @@
+'''
+Nesse módulo constam definições de funções para resolução do K-TSP 
+(generalização do 2-TSP) e chamadas a essas funções para análise do 2-TSP. 
+
+Dependências externas:
+    - Gurobi (https://www.gurobi.com/documentation/9.0/)
+    - tqdm (https://tqdm.github.io/)
+'''
+
 #%%
 import sys
 import math
