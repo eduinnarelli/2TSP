@@ -10,4 +10,4 @@ Atividade 2 de MC859 - Projeto em Teoria da Computação.
 
 Disciplina oferecida no 2º semestre de 2020 pelo professor [Fábio Luiz Usberti](https://www.ic.unicamp.br/~fusberti/).
 
-[Instituto de Computação](http://ic.unicamp.br/en) - [UNICAMP](http://www.unicamp.br/unicamp/) (Universidade Estadual de Campinas)
+[Instituto de Computação](http://ic.unicamp.br/) - [UNICAMP](http://www.unicamp.br/unicamp/) (Universidade Estadual de Campinas)
