@@ -1,7 +1,7 @@
 Problema dos Dois Caixeiros Viajantes (2TSP)
 ================================
 
-Atividade 2 de MC859 - Projeto em Teoria da Computação.
+Atividade 2 de MO824 - Tópicos em Otimização Combinatória.
 
 **Grupo:**
   - Eduardo Barros Innarelli (170161)
